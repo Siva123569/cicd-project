@@ -7,44 +7,73 @@ pool:
 variables:
   imageName: nsbyadav14e/siva5
 
-steps:
-- task: Maven@4
-  displayName: 'Maven my-app/pom.xml'
-  inputs:
-    azureSubscription: AzureSPConnection
-    mavenPomFile: 'my-app/pom.xml'
+stages:
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: MavenBuild
+    displayName: 'Maven Build Job'
+    steps:
+    - task: Maven@4
+      displayName: 'Build with Maven'
+      inputs:
+        azureSubscription: 'Azure subscription 1(e4f76d47-ca43-4e93-ad46-55dfe9196780)'
+        mavenPomFile: 'my-app/pom.xml'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        javaHomeOption: 'JDKVersion'
+        mavenVersionOption: 'Default'
+        mavenAuthenticateFeed: false
+        effectivePomSkip: false
+        sonarQubeRunAnalysis: false
 
-steps:
-- task: PublishPipelineArtifact@1
-  displayName: 'Publish Pipeline Artifact'
-  inputs:
-    targetPath: '$(build.artifactstagingdirectory)'
-    artifact: drop
+    - task: PublishPipelineArtifact@1
+      displayName: 'Publish Pipeline Artifact'
+      inputs:
+        targetPath: '$(Build.ArtifactStagingDirectory)'
+        artifact: 'drop'
+        publishLocation: 'pipeline'
 
-steps:
-- task: Docker@2
-  displayName: buildAndPush
-  inputs:
-    containerRegistry: DockerHubConnection
-    repository: nsbyadav14e/siva5
-    Dockerfile: 'my-app/Dockerfile'
-    tags: latest
+- stage: DockerBuild
+  displayName: 'Docker Build and Push'
+  dependsOn: Build
+  jobs:
+  - job: DockerJob
+    displayName: 'Build & Push Docker Image'
+    steps:
+    - task: Docker@2
+      displayName: 'Build and Push Docker Image'
+      inputs:
+        containerRegistry: 'DockerHubConnection'
+        repository: 'nsbyadav14e/siva5'
+        command: 'buildAndPush'
+        Dockerfile: 'my-app/Dockerfile'
+        tags: 'latest'
 
-steps:
-- task: KubectlInstaller@0
-  displayName: 'Install Kubectl latest'
+- stage: Deploy
+  displayName: 'Kubernetes Deploy'
+  dependsOn: DockerBuild
+  jobs:
+  - job: KubernetesDeploy
+    displayName: 'Deploy to Kubernetes'
+    steps:
+    - task: KubectlInstaller@0
+      displayName: 'Install Kubectl'
+      inputs:
+        kubectlVersion: 'latest'
 
-steps:
-- task: Kubernetes@1
-  displayName: 'kubectl apply'
-  inputs:
-    connectionType: 'Azure Resource Manager'
-    azureSubscriptionEndpoint: AzureSPConnection
-    azureResourceGroup: rg01shiva
-    kubernetesCluster: cluster01
-    namespace: default
-    command: apply
-    useConfigurationFile: true
-    configuration: '$(System.DefaultWorkingDirectory)/_maven-repo/my-app/azure-pipelines.yml'
-    containerRegistryType: 'Container Registry'
-    dockerRegistryEndpoint: DockerHubConnection
+    - task: Kubernetes@1
+      displayName: 'kubectl apply'
+      inputs:
+        connectionType: 'Azure Resource Manager'
+        azureSubscriptionEndpoint: 'AzureSPConnection'
+        azureResourceGroup: 'rg01shiva'
+        kubernetesCluster: 'cluster01'
+        namespace: 'default'
+        command: 'apply'
+        useConfigurationFile: true
+        configuration: '$(System.DefaultWorkingDirectory)/_maven-repo/my-app/azure-pipelines.yml'
+        secretType: 'dockerRegistry'
+        containerRegistryType: 'Container Registry'
+        dockerRegistryEndpoint: 'DockerHubConnection'
+
