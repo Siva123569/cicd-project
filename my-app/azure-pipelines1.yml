@@ -17,7 +17,7 @@ stages:
     - task: Maven@4
       displayName: 'Build with Maven'
       inputs:
-        azureSubscription: 'Azure subscription 1(e4f76d47-ca43-4e93-ad46-55dfe9196780)'
+        azureSubscription: 'AzureSPConnection'
         mavenPomFile: 'my-app/pom.xml'
         publishJUnitResults: true
         testResultsFiles: '**/surefire-reports/TEST-*.xml'
@@ -72,8 +72,6 @@ stages:
         namespace: 'default'
         command: 'apply'
         useConfigurationFile: true
-        configuration: '$(Build.SourcesDirectory)/_maven-repo/my-app/azure-pipelines.yml'
-        secretType: 'dockerRegistry'
+        configuration: '$(System.DefaultWorkingDirectory)/my-app/azure-pipelines.yml'
         containerRegistryType: 'Container Registry'
         dockerRegistryEndpoint: 'DockerHubConnection'
-
